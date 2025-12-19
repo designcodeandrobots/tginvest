@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+
+# Virtualenv
+.venv/
+
+# Secrets
+config.yaml
+
+# Database
+news.db
+
+# Temp / logs
+*.log
+last_selection.json
+

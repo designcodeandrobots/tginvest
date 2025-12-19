@@ -1,0 +1,15 @@
+sources:
+  - name: "Investing.com"
+    url: "https://www.investing.com/rss/news.rss"
+
+  - name: "MarketWatch"
+    url: "https://feeds.marketwatch.com/marketwatch/topstories/"
+
+  - name: "CNBC Top News"
+    url: "https://www.cnbc.com/id/100003114/device/rss/rss.html"
+
+  - name: "Yahoo Finance"
+    url: "https://finance.yahoo.com/rss/topstories"
+
+  - name: "CoinDesk"
+    url: "https://www.coindesk.com/arc/outboundfeeds/rss/"
