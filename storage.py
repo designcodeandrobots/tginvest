@@ -1,4 +1,3 @@
-# storage.py
 from db import get_conn
 
 def save_news(items: list[dict]) -> int:
@@ -12,15 +11,14 @@ def save_news(items: list[dict]) -> int:
                 INSERT INTO news (source, title, url, published, summary)
                 VALUES (?, ?, ?, ?, ?)
             """, (
-                item["source"],
-                item["title"],
-                item["url"],
-                item["published"],
-                item["summary"],
+                item.get("source", ""),
+                item.get("title", ""),
+                item.get("url", ""),
+                item.get("published", ""),
+                item.get("summary", ""),
             ))
             saved += 1
         except Exception:
-            # дубликат
             pass
 
     conn.commit()

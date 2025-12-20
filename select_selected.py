@@ -1,7 +1,6 @@
-# select_selected.py
 import sqlite3
 
-def fetch_selected(limit: int = 10):
+def fetch_selected(limit: int = 1):
     conn = sqlite3.connect("news.db")
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()

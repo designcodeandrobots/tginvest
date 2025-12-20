@@ -10,8 +10,12 @@ from summarize import summarize_items
 from apply_selection import apply_selected
 from select_selected import fetch_selected
 from formatter import format_post
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from telegram import Bot
+from telegram.error import TimedOut, NetworkError
+from telegram.request import HTTPXRequest
 
 
 def load_cfg():
@@ -24,18 +28,16 @@ def load_sources():
         return yaml.safe_load(f)["sources"]
 
 
-def mark_new_as_skipped(ids: list[int]):
-    if not ids:
-        return
-    conn = sqlite3.connect("news.db")
-    cur = conn.cursor()
-    cur.executemany("UPDATE news SET status='skipped' WHERE id=?", [(i,) for i in ids])
-    conn.commit()
-    conn.close()
-
-
 async def post_selected(cfg: dict, limit: int) -> int:
-    bot = Bot(token=cfg["telegram"]["token"])
+    # Telegram timeouts (важно, чтобы не висело)
+    request = HTTPXRequest(
+        connection_pool_size=4,
+        connect_timeout=20,
+        read_timeout=40,
+        write_timeout=40,
+    )
+
+    bot = Bot(token=cfg["telegram"]["token"], request=request)
     chat_id = cfg["telegram"]["chat_id"]
 
     items = fetch_selected(limit=limit)
@@ -50,12 +52,28 @@ async def post_selected(cfg: dict, limit: int) -> int:
     for item in items:
         text = format_post(item)
 
-        await bot.send_message(
-            chat_id=chat_id,
-            text=text,
-            parse_mode="HTML",  # важно для <b> и <a>
-            disable_web_page_preview=True,
-        )
+        sent = False
+        for attempt in range(3):  # 3 попытки
+            try:
+                await bot.send_message(
+                    chat_id=chat_id,
+                    text=text,
+                    parse_mode="HTML",  # нужно для <a href="..."> и <b>
+                    disable_web_page_preview=True,
+                    disable_notification=True,
+                )
+                sent = True
+                break
+            except (TimedOut, NetworkError) as e:
+                # 2s, 4s пауза; после 3-й попытки — сдаёмся до следующего запуска
+                if attempt < 2:
+                    await asyncio.sleep(2 * (attempt + 1))
+                    continue
+                print(f"Telegram send failed (will retry next run): {type(e).__name__}: {e}")
+
+        if not sent:
+            # Не падаем. Оставляем status='selected', чтобы в следующий запуск отправить снова.
+            continue
 
         cur.execute("UPDATE news SET status='posted' WHERE id=?", (item["id"],))
         posted += 1
@@ -67,25 +85,28 @@ async def post_selected(cfg: dict, limit: int) -> int:
 
 
 async def main():
+    now_msk = datetime.now(ZoneInfo("Europe/Moscow"))
+    if not (7 <= now_msk.hour < 24):
+        print(f"Outside work hours MSK ({now_msk:%Y-%m-%d %H:%M}), exiting.")
+        return
+
     cfg = load_cfg()
     init_db()
 
-    # --- 1) RSS -> SQLite ---
+    # 1) RSS -> SQLite
     sources = load_sources()
     total_saved = 0
     for src in sources:
-        items = fetch_rss(src["name"], src["url"])
+        items = fetch_rss(src["name"], src["url"], timeout=10, max_entries=30)
         saved = save_news(items)
         total_saved += saved
         print(f"{src['name']}: +{saved}")
 
     print("Saved new items:", total_saved)
 
-    # --- 2) new -> selected (через OpenAI) ---
+    # 2) new -> selected (OpenAI)
     openai_cfg = cfg.get("openai", {})
     max_batch = int(openai_cfg.get("max_items_in_batch", 25))
-    pick_top = int(openai_cfg.get("pick_top", 5))
-
     new_items = fetch_new(limit=max_batch)
     print("Fetched new for OpenAI:", len(new_items))
 
@@ -93,25 +114,16 @@ async def main():
         data = summarize_items(cfg, new_items)
         selected = data.get("selected", [])
         print("Selected:", len(selected))
-
         if selected:
             apply_selected(selected)
 
-            # (опционально) чтобы “не крутить” одни и те же new снова и снова:
-            selected_ids = {s["id"] for s in selected if "id" in s}
-            leftovers = [it["id"] for it in new_items if it["id"] not in selected_ids]
-            # Можно либо оставить их new, либо пометить skipped.
-            # Я рекомендую skipped, чтобы не гонять снова в тестах.
-            mark_new_as_skipped(leftovers)
-        else:
-            print("OpenAI ничего не выбрал — оставляем new как есть")
-    else:
-        print("Нет new новостей для OpenAI")
-
-    # --- 3) selected -> posted (Telegram) ---
-    post_limit = int(cfg.get("telegram", {}).get("post_limit", pick_top))
+    # 3) selected -> posted (Telegram)
+    post_limit = int(cfg.get("telegram", {}).get("post_limit", 1))
     await post_selected(cfg, limit=post_limit)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(asyncio.wait_for(main(), timeout=480))
+    except asyncio.TimeoutError:
+        print("❌ Main timeout: execution took too long")

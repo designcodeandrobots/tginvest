@@ -1,4 +1,3 @@
-# db.py
 import sqlite3
 from pathlib import Path
 
@@ -20,6 +19,9 @@ def init_db():
             published TEXT,
             summary TEXT,
             status TEXT DEFAULT 'new',
+            headline_ru TEXT,
+            summary_ru TEXT,
+            tags TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)

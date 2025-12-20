@@ -1,0 +1,6 @@
+telegram:
+  token: "PUT_YOUR_TOKEN_HERE"
+  chat_id: "@your_channel"
+
+openai:
+  api_key: "PUT_OPENAI_KEY_HERE"
