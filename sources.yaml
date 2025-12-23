@@ -13,5 +13,5 @@ sources:
     url: "https://www.coindesk.com/arc/outboundfeeds/rss/"
 
   # --- Russia (ONLY ONE) ---
-  - name: "РБК (full)"
+  - name: "РБК"
     url: "https://rssexport.rbc.ru/rbcnews/news/30/full.rss"
