@@ -107,7 +107,7 @@ async def main():
     # 2) new -> selected (OpenAI)
     openai_cfg = cfg.get("openai", {})
     max_batch = int(openai_cfg.get("max_items_in_batch", 25))
-    new_items = fetch_new(limit=max_batch)
+    new_items = fetch_new(limit=max_batch, per_source=6)
     print("Fetched new for OpenAI:", len(new_items))
 
     if new_items:

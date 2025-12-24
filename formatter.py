@@ -1,27 +1,17 @@
-from emoji import emoji_for_tag
-
-CHANNEL_USERNAME = "investnewsbottoday"
+# formatter.py
 
 def format_post(item: dict) -> str:
-    """
-    Формат:
-    #тег@channel
-    📰 Новость <a href="url">–Источник</a>
-    """
-
+    # тег
     raw_tags = item.get("tags") or ""
     tag = raw_tags.split(",")[0].strip().lower() if raw_tags else "новости"
-    hashtag = f"#{tag.replace(' ', '_')}@{CHANNEL_USERNAME}"
+    hashtag = f"#{tag.replace(' ', '_')}"
 
-    emoji = emoji_for_tag(tag)
+    # текст (OpenAI уже добавляет эмодзи в начале headline_ru)
+    text = (item.get("headline_ru") or item.get("summary_ru") or "").strip()
 
-    text = item.get("headline_ru") or item.get("summary_ru") or ""
-    source = item.get("source", "Источник")
-    url = item.get("url", "")
-    source_link = f'<a href="{url}">–{source}</a>'
+    # на всякий случай: если в конце нет точки — добавим
+    if text and text[-1] not in ".!?…":
+        text += "."
 
-    # ⬇⬇⬇ ВАЖНО: меняем порядок строк
-    return (
-        f"{hashtag}\n"
-        f"{emoji} {text} {source_link}"
-    )
+    # одинлайн формат
+    return f"{text} {hashtag}"

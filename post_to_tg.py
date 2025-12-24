@@ -29,6 +29,7 @@ async def main():
             text=text,
             parse_mode="HTML",              
             disable_web_page_preview=True,
+            disable_notification=True,
         )
 
         cur.execute(
